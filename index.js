@@ -56,10 +56,6 @@ const allCommands = [ "/market", "/market@railtransbot", "/send", "/send@railtra
 const devCommands = ["/stats@railtransbot", "/ban@railtransbot"]
 
 
-// - sabotage
-// - winEvent
-// - improve - bot sending message about city grow
-
 
 // Main 
 bot.on("message", msg => {
@@ -227,11 +223,6 @@ bot.on("message", msg => {
     }
 
 })
-
-
-updateNeeds(market, econ)
-updateMarket(market, econ)
-saveMarket(market)
 
 
 
