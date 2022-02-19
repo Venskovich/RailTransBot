@@ -9,14 +9,13 @@ const specChat = require("./specChat.json")
 var econ = require("./econ.json")
 var market = require("./market.json")
 var players = require("./players.json")
-var banlist = require("./banlist.json")
 var stats = require("./stats.json")
 
 // Import
-const { sendMessage, deleteMessage, saveBanlist, savePlayers, saveStats, saveMarket, isRequest, getGood, updateMarket, checkSupply, cityGrow, delayToNextHour, numLayout, updateNeeds, saveEcon } = require("./otherFunctions")
-const { getStats, ban } = require("./devFunctions")
+const { sendMessage, deleteMessage, savePlayers, saveStats, saveMarket, isRequest, updateMarket, checkSupply, cityGrow, delayToNextHour, numLayout, updateNeeds, saveEcon, calcIncome, delayToFourthHour, delayToMidnight } = require("./otherFunctions")
+const { getStats, give } = require("./devFunctions")
 const { getPlayer, updateBonus } = require("./playerFunctions") 
-const { getMarketInfo, train, about, give, send, back, start, readme, rename, best, bonus } = require("./mainFunctions")
+const { getMarketInfo, buy, about, send, back, start, readme, rename, best, bonus } = require("./mainFunctions")
 
 
 
@@ -26,11 +25,10 @@ bot.setMyCommands([
     { command: "/market", description: "Market info" },
     { command: "/send", description: "Send trains to supply goods" },
     { command: "/back", description: "Get back trains to depot" },
-    { command: "/train", description: "Buy a train" },
+    { command: "/buy", description: "Buy a train, bank slot, factory equipment etc." },
     { command: "/about", description: "Player info" },
-    { command: "/bonus", description: "Get bonus" },
+    { command: "/bonus", description: "Get bonus from rails & wagon productions" },
     { command: "/best", description: "Best players" },
-    { command: "/give", description: "Support a player" },
     { command: "/readme", description: "Gameplay & Updates news" }
 ])
 
@@ -39,26 +37,47 @@ const commands = {
     market: "/market",
     send: "/send",
     back: "/back",
-    train: "/train",
+    buy: "/buy",
     about: "/about",
     bonus: "/bonus",
     best: "/best",
-    give: "/give",
     readme: "/readme",
 
     stats: "/stats@railtransbot",
-    ban: "/ban@railtransbot",
+    give: "/give",
 
     rename: "/rename",
     start: "/start"
 }
-const allCommands = [ "/market", "/market@railtransbot", "/send", "/send@railtransbot", "/back", "/back@railtransbot", "/train", "/train@railtransbot", "/about", "/about@railtransbot", "/bonus", "/bonus@railtransbot", "/best", "/best@railtransbot", "/give", "/give@railtransbot", "/readme", "/readme@railtransbot", "/rename", "/rename@railtransbot", "/start", "/start@railtransbot"]
-const devCommands = ["/stats@railtransbot", "/ban@railtransbot"]
+const allCommands = [ "/market", "/market@railtransbot", "/send", "/send@railtransbot", "/back", "/back@railtransbot", "/buy", "/buy@railtransbot", "/about", "/about@railtransbot", "/bonus", "/bonus@railtransbot", "/best", "/best@railtransbot", "/readme", "/readme@railtransbot", "/rename", "/rename@railtransbot", "/start", "/start@railtransbot"]
+const devCommands = ["/stats@railtransbot", "/give"]
+
+
+
+// FUTURE UPDATES
+// - new train type
+// - special good
+// - train sale 
+// - tenders && discounts
+// - about full
+// - new player finances
+// - same name restricted
+// - winEvent
+
+// TASK TO DO NOW
+// - message info improvement
+
 
 
 
 // Main 
 bot.on("message", msg => {
+
+    // If group chat is wrong, then leave it
+    if (msg.chat.type != "private" && msg.chat.id != specChat.id) {
+        bot.leaveChat(msg.chat.id)
+        return
+    }
 
     // Creating these variables to make it easier to operate with message
     let text = msg.text.toLowerCase()
@@ -77,7 +96,7 @@ bot.on("message", msg => {
     // If a message is not a command request, then ignore it and do not execute the following code
     // The same is if message was sent by bot
     // Otherwise create the new player or initialize it
-    if ((!isRequest(allCommands, text) && !(devCommands.includes(text) && user.id === dev.id))) {
+    if ((!isRequest(allCommands, text) && !(isRequest(devCommands, text) && user.id === dev.id))) {
 
         return
 
@@ -93,7 +112,6 @@ bot.on("message", msg => {
 
     }
 
-
     // Bot commands
     if (text.includes(commands.market)) {
 
@@ -102,8 +120,8 @@ bot.on("message", msg => {
     } else if (text.includes(commands.send)) {
 
         reply = send(text, player, market)
-        savePlayers(players)
 
+        // If every need of the city is supplied, then make city grow
         if (checkSupply(market)) {
 
             while (checkSupply(market)) {
@@ -115,7 +133,14 @@ bot.on("message", msg => {
             saveEcon(econ)
 
             sendMessage(bot, chatId, `🏙Kyiv has grown\nPopulation: ${numLayout(market.population)}`)
+
+
+            // Giving some bonus to that player, whose last action has provoked the growth
+            player.finance += econ.bonus
+
         }
+
+        savePlayers(players)
 
         updateMarket(market, econ)
         saveMarket(market)
@@ -128,9 +153,9 @@ bot.on("message", msg => {
         updateMarket(market, econ)
         saveMarket(market)
 
-    } else if (text.includes(commands.train)) {
+    } else if (text.includes(commands.buy)) {
 
-        reply = train(player, econ)
+        reply = buy(player, text, econ)
         savePlayers(players)
 
     } else if (text.includes(commands.about)) {
@@ -141,7 +166,7 @@ bot.on("message", msg => {
             savePlayers(players)
         }
 
-        reply = about(player, market)
+        reply = about(player, market, players, econ)
 
     } else if (text.includes(commands.bonus)) {
 
@@ -152,28 +177,18 @@ bot.on("message", msg => {
 
         reply = best(players, market, econ, text)
 
-    } else if (text.includes(commands.give)) {
-
-        if (!msg.reply_to_message) {
-            reply = `<a href="tg://user?id=${player.id}">${player.name}</a>, please reply that user message, who you wish to give some money`
-        } else {
-
-            // Checking if user is banned to give someone money
-            if (!banlist.includes(player.id)) {
-                reply = give(player, getPlayer(msg.reply_to_message.from, players), text)
-                savePlayers(players)
-            } else {
-                reply = `<a href="tg://user?id=${player.id}">${player.name}</a>, you are not allowed to give money`
-            }
-
-        }
-
     } else if (text.includes(commands.readme)) {
 
         reply = readme()
 
     } else if (text.includes(commands.rename)) {
 
+        // The ability for developer to rename player profile
+        if (msg.reply_to_message && user.id === dev.id) {
+            player = getPlayer(msg.reply_to_message.from, players)
+        }
+
+        // Executing
         reply = rename(player, msg.text)
         savePlayers(players)
 
@@ -185,32 +200,24 @@ bot.on("message", msg => {
 
         reply = getStats(stats)
 
-    } else if (text.includes(commands.ban)) {
+    } else if (text.includes(commands.give)) {
 
-        reply = ban(msg.reply_to_message, banlist)
-        saveBanlist(banlist)
-
-    }
-
-
-    // If a player plays the game outside the chat the bot was created for, then warn him to play bot there
-    if (chatId != specChat.id && !(text.includes(commands.start) || text.includes(commands.readme))) {
-
-        if (reply.endsWith("\n\n") || reply.endsWith("\n\n</code>")) {
-            reply += `Play there: @nause121`
-        } else if (reply.endsWith("\n") || reply.endsWith("\n</code>")) {
-            reply += `\nPlay there: @nause121`
+        if (msg.reply_to_message) {
+            player = getPlayer(msg.reply_to_message.from, players)
+            reply = give(null, player, text)
         } else {
-            reply += `\n\nPlay there: @nause121`
+            reply = give(players, null, text)
         }
 
-    }
+        savePlayers(players)
+
+    } 
 
 
     // Deleting message which contains command request
     // While bot shouldn't delete reply message if is private chat with bot
     deleteMessage(bot, chatId, msgId)
-    if (msg.chat.type != "private") {
+    if (msg.chat.type != "private" && !text.includes(commands.give)) {
         deleteMessage(bot, chatId, msgId + 1, 40)
     }
 
@@ -226,41 +233,147 @@ bot.on("message", msg => {
 
 
 
-// Calculating income
+// Execute when the program is started
+updateNeeds(market, econ)
+
+if (checkSupply(market)) {
+
+    while (checkSupply(market)) {
+        cityGrow(market, econ)
+        updateNeeds(market, econ)
+        updateMarket(market, econ)
+    }
+
+    saveEcon(econ)
+
+}
+
+updateMarket(market, econ)
+saveMarket(market)
+
+
+
+// Calculating income for all players every 30 seconds
 setInterval(function() {
 
-    for (player of players) {
-
-        for (supply of player.supplies) {
-            let good = getGood(supply.code, market)
-            player.finance += supply.trains * good.cost.current
-        }
-    
+    for (let player of players) {
+        player.finance += calcIncome(player, market, players)
     }
 
     savePlayers(players)
 
 }, 30 * 1000)
 
-// Updating bonus status && market needs every hour
+// Updating market needs every hour
 setTimeout(function() {
 
-    updateBonus(players)
-    savePlayers(players)
-
     updateNeeds(market, econ)
+
+    if (checkSupply(market)) {
+
+        while (checkSupply(market)) {
+            cityGrow(market, econ)
+            updateNeeds(market, econ)
+            updateMarket(market, econ)
+        }
+
+        saveEcon(econ)
+
+    }
+
     updateMarket(market, econ)
     saveMarket(market)
 
     setInterval(function() {
 
-        updateBonus(players)
-        savePlayers(players)
-
         updateNeeds(market, econ)
+
+        if (checkSupply(market)) {
+
+            while (checkSupply(market)) {
+                cityGrow(market, econ)
+                updateNeeds(market, econ)
+                updateMarket(market, econ)
+            }
+    
+            saveEcon(econ)
+    
+        }
+
         updateMarket(market, econ)
         saveMarket(market)
 
     }, 60 * 60 * 1000)
 
 }, delayToNextHour())
+
+// Updating bonus status of rails production
+setTimeout(function() {
+
+    updateBonus("rails", players)
+    savePlayers(players)
+
+    setInterval(function() {
+
+        updateBonus("rails", players)
+        savePlayers(players)
+
+    }, 60 * 60 * 1000)
+
+}, delayToNextHour())
+
+// Updating bonus status of wagon production
+setTimeout(function() {
+
+    updateBonus("wagon", players)
+    savePlayers(players)
+
+    setInterval(function() {
+
+        updateBonus("wagon", players)
+        savePlayers(players)
+
+    }, 4 * 60 * 60 * 1000)
+
+}, delayToFourthHour())
+
+
+
+// Updating game cycle
+setTimeout(function() {
+
+    let today = new Date()
+
+    if (today.getDate() === 1) {
+        updateGame() 
+    }
+
+    setInterval(function() {
+
+        today = new Date()
+
+        if (today.getDate() === 1) {
+            updateGame() 
+        }
+
+    })
+
+}, delayToMidnight())
+
+function updateGame() {
+
+    players = []
+    savePlayers(players)
+
+    for (let good of market.goods) {
+        good.trains.supplies = 0
+    }
+
+    econ.needsRange = [2, 3, 4, 5, 6, 7, 8, 9]
+    saveEcon(econ)
+
+    updateNeeds(market, econ)
+    updateMarket(market, econ)
+    saveMarket(market)
+
+}

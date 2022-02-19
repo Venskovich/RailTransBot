@@ -18,9 +18,17 @@ function createPlayer(user, players) {
             free: 4,
             busy: 0
         },
-        finance: 300000,
+        finance: 100000,
         supplies: [],
-        bonus: false
+        rails: {
+            level: 1,
+            bonus: false
+        },
+        wagon: {
+            level: 1,
+            bonus: false    
+        },
+        bank: 300000
     }
 
     // Pushing the newPlayer
@@ -45,10 +53,21 @@ function getPlayer(user, players) {
 }
 
 // Update bonus status
-function updateBonus(players) {
+function updateBonus(type, players) {
 
-    for (player of players) {
-        player.bonus = false
+    if (type === "rails") {
+        for (let player of players) {
+            player.rails.bonus = false
+        }
+    } else if (type === "wagon") {
+        for (let player of players) {
+            player.wagon.bonus = false
+        }
+    } else {
+        for (let player of players) {
+            player.rails.bonus = false
+            player.wagon.bonus = false
+        }
     }
-
+    
 }

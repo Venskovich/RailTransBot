@@ -1,9 +1,9 @@
 // Import
 const dev = require("./dev.json")
-const { getName } = require("./otherFunctions")
+const {  priceLayout } = require("./otherFunctions")
 
 // Export
-module.exports = { getStats, ban }
+module.exports = { getStats, give }
 
 
 
@@ -13,37 +13,34 @@ function getStats(stats) {
     return `stats: ${stats}`
 }
 
-// FUnction of dev command, which bans a player transactions ability
-function ban(repliedMsg, banlist) {
+// Function to give a million to all players if there is any bug found
+function give(players, player, text) {
 
-    // Checking if there is replied message
-    if (!repliedMsg) {
-        return `<a href="tg://user?id=${dev.id}">${dev.name}</a>, please reply that user message, who you wish to ban`
-    } 
+    // Working with the text
+    let items = text.split(" ")
 
+    if (items.length != 2 || !parseInt(items[1]) || parseInt(items[1]) < 0) {
+        return `<a href="tg://user?id=${dev.id}">${dev.name}</a>, specify amount of money as the second parameter`
+    }
 
-    // Getting player to ban
-    let player = repliedMsg.from
+    // How much money to give
+    let param = parseInt(items[1])
+    
+    // Whether to give money to all players or the one
+    if (players != null) {
 
-    // Reply message to return
-    let reply = `Player <a href="tg://user?id=${player.id}">${getName(player)}</a>`
+        for (let player of players) {
+            player.finance += param
+        }
 
-
-    // If this user is already banned, then unban him. Otherwise - ban
-    if (banlist.includes(player.id)) {
-
-        // Getting off the banlist
-        banlist.splice(banlist.indexOf(player.id), 1)
-
-        return `${reply} is free to give money`
+        return `<a href="tg://user?id=${dev.id}">${dev.name}</a> has given everyone ${priceLayout(param)}`
 
     } else {
 
-        // Pushing to the banlist
-        banlist.push(player.id)
+        player.finance += param
 
-        return `${reply} is forbidden to give money`
+        return `<a href="tg://user?id=${dev.id}">${dev.name}</a> has given <a href="tg://user?id=${player.id}">${player.name}</a> ${priceLayout(param)}`
 
     }
- 
+
 }

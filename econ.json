@@ -1,1 +1,27 @@
-{"trainCost":1000000,"fullSupply":3,"bonus":25000,"needsRange":[2,2,3,3,4,5,6,7],"goodCost":{"maxmax":220,"maxmin":100}}
+{
+    "trainCostStep": 100000,
+    "trainInCost": 1000000,
+    "bankRise": 100000,
+    "bankCostStep": 10000,
+    "bankMin": 300000,
+    "bankMax": 3500000,
+    "wagonIncome": 30000,
+    "railsIncome": 5000,
+    "railsMax": 10,
+    "wagonMax": 10,
+    "needsRange": [
+        40,
+        41,
+        43,
+        35,
+        47,
+        40,
+        52,
+        43
+    ],
+    "fullSupply": 2,
+    "goodCost": {
+        "maxmax": 300,
+        "maxmin": 200
+    }
+}
