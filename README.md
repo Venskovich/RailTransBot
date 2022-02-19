@@ -13,4 +13,4 @@ https://t.me/railtransbot
 
 https://telegra.ph/railtrans-02-09 (readme gameplay)
 
-The project is implemented for an appropriate chat - https://t.me/nause121 . To make it avaiable for all chats, I should have more powerful server, which means more spends, so it is available only for chat NOW
+The project is implemented for an appropriate chat - https://t.me/nause121 . To make it avaiable for all chats, I should have more powerful server, which means more spends, so it is available only for one public chat NOW
